@@ -1,0 +1,43 @@
+{
+    "name": "oticon-audio-explorers-2024-devcontainer",
+    "build": {
+        "context": "..",
+        "dockerfile": "Dockerfile"
+    },
+    "workspaceFolder": "/workspace",
+    "workspaceMount": "source=.,target=/workspace,type=bind",
+    "mounts": [
+        // "source=<directory-on-host>,target=<directory-in-container>,type=bind"
+    ],
+    "features": {
+        "ghcr.io/devcontainers/features/git:1": { },
+        "ghcr.io/devcontainers/features/common-utils:2": {
+            "installZsh": false,
+            "upgradePackages": false
+        },
+        "ghcr.io/meaningful-ooo/devcontainer-features/fish:1": { }
+    },
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-python.python",
+                "ms-toolsai.jupyter",
+                "ms-vsliveshare.vsliveshare"
+            ],
+            "settings": {
+                "python.terminal.activateEnvironment": false,
+                "python.analysis.typeCheckingMode": "basic",
+                "python.defaultInterpreterPath": "/home/non-root/micromamba/envs/env/bin/python"
+            }
+        }
+    },
+    "hostRequirements": {
+        "gpu": true
+    },
+    "runArgs": [
+        "--shm-size=4gb"
+    ],
+    "overrideCommand": true,
+    "postCreateCommand": "./.devcontainer/init.create.sh",
+    "postStartCommand": "./.devcontainer/init.start.sh"
+}

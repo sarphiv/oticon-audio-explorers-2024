@@ -1,0 +1,13 @@
+# Pre-commit
+pre-commit~=3.7.0
+
+# Testing
+pytest~=8.1.1
+
+# Linting
+ruff~=0.3.5
+
+# Interactive
+ipython~=8.23.0
+ipykernel~=6.29.4
+ipympl~=0.9.3
