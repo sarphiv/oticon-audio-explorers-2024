@@ -186,6 +186,7 @@ lightning_logs/
 # Large files
 data/*
 !data/.gitkeep
+!data/raw/*noisy_mixture_32ch.wav
 
 models/*
 !models/.gitkeep
