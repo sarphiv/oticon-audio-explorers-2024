@@ -13,7 +13,7 @@ Choose __**ONE**__ of the following:
 # Data export
 
 **Extracting channels**  
-To extract the 32 data channels add the ``.wav`` file to ``models/raw`` and run the following command:
+To extract the 32 data channels add the ``.wav`` file to ``data/raw`` and run the following command:
 ```
 python src/modelling/data/utils/export_channels.py
 ```
