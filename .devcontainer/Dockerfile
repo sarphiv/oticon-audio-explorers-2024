@@ -19,10 +19,8 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update -y && \
     libsm6 \
     libxext6 \
     build-essential \
-    ninja-build \
-    nvidia-cuda-toolkit \
-    nvidia-cuda-toolkit-gcc && \
-    apt clean &&\
+    ninja-build && \
+    apt clean && \
     rm -rf /var/lib/apt/lists/*
 
 

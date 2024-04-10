@@ -31,11 +31,9 @@
             }
         }
     },
-    "hostRequirements": {
-        "gpu": true
-    },
     "runArgs": [
-        "--shm-size=4gb"
+        "--shm-size=4gb",
+        "--gpus=all"
     ],
     "overrideCommand": true,
     "postCreateCommand": "./.devcontainer/init.create.sh",
