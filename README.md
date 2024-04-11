@@ -24,4 +24,5 @@ To extract the positions of the microphones run the following command:
 ```
 python src/modelling/utils/export_mic_pos.py
 ```
-The command will create ``mic_pos.npy`` in ``src/modelling/utils``
+The command will create ``mic_pos.npy`` in ``src/modelling/utils``.
+The numpy file is a 32x4 np.ndarray with collumns: ``{id, x, y, z}``.
