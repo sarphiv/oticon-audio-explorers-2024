@@ -21,8 +21,8 @@ The command will save all the channels to ``data/channels``
 
 **Calculating positions**  
 To extract the positions of the microphones run the following command:
+```python
+python -m modelling.utils.export_mic_pos
 ```
-python src/modelling/utils/export_mic_pos.py
-```
-The command will create ``mic_pos.npy`` in ``src/modelling/utils``.
-The numpy file is a 32x4 np.ndarray with collumns: ``{id, x, y, z}``.
+The command will create ``mic_pos.npy`` in ``data/``.
+The numpy file is a 32x3 np.ndarray with the shape: `n_mics X 3`.

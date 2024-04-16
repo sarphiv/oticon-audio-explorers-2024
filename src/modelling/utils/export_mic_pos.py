@@ -55,8 +55,7 @@ if __name__ == "__main__":
     ids = np.array(list(ANGLE_DICT.keys()))
     
     # save to file
-    data = np.hstack((ids[:,np.newaxis], coords))
-    np.save("models/utils/mic_pos.npy", data)
+    np.save("data/mic_pos.npy", coords)
 
     viz = False
     
