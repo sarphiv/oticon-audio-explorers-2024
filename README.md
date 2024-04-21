@@ -11,6 +11,7 @@ Choose __**ONE**__ of the following:
 
 
 ## Enhancing an audio file
+Provide an input directory full of audio files with 32 channels. The output is stored in the specified output directory.
 ```bash
 python -m modelling.enhance --input_dir=data/raw --output_dir=output
 ```
