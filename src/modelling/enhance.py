@@ -276,9 +276,9 @@ if __name__ == "__main__":
     # Load arguments
     args = tyro.cli(Args)
 
-    # NOTE: Remove the call to "len" if the input directory is large
-    input_files = args.input_dir.glob("*.wav")
-    for file in tqdm(input_files, total=len(list(input_files))):
+    # NOTE: Remove the use of list if input directory is large
+    input_files = list(args.input_dir.glob("*.wav"))
+    for file in tqdm(input_files):
         # Load audio
         sample_rate, audio_raw = wavfile.read(file)
         audio_enhanced = enhance_audio(audio_raw.T, sample_rate)
