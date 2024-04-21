@@ -141,25 +141,30 @@ def align_audio(audio_raw: np.ndarray, sample_rate: int, microphone_idx: np.ndar
 
 
 
-def choose_microphones(doas: np.ndarray) -> np.ndarray:
+def choose_microphones(doas: np.ndarray, microphone_idx: np.ndarray | None = None) -> np.ndarray:
     """Choose the four microphones closest to the direction of arrival. Assuming stationary speaker.
     
     Args:
         doas (np.ndarray): The direction of arrival estimates with shape (num_time_frames, 3).
+        microphone_idx (np.ndarray | None): Indices of subset of microphones to use. Set to None to use all microphones.
 
     Returns:
         np.ndarray: The indices of the four microphones closest to the direction of arrival.
     """
+    # If microphone indices not provided, use all microphones
+    if microphone_idx is None:
+        microphone_idx = np.arange(audio_raw.shape[0])
+    
     # Get unit direction
     direction = doas.mean(0)
     direction /= np.linalg.norm(direction, 2)
     
     # Normalize microphone positions to unit vectors
-    mic_pos_unit = mic_pos / np.linalg.norm(mic_pos, 2, axis=1)[:, None]
+    mic_pos_unit = mic_pos[microphone_idx] / np.linalg.norm(mic_pos[microphone_idx], 2, axis=1)[:, None]
 
 
     # Get indices of four closest microphones
-    return np.sort(np.argpartition(np.linalg.norm(mic_pos_unit - direction, 2, axis=1), 4)[:4])
+    return np.sort(np.argpartition(np.linalg.norm(mic_pos_unit - direction, 2, axis=1), 3)[:4])
 
 
 def separate_audio(audio_aligned: np.ndarray, sample_rate: int) -> np.ndarray:
@@ -234,7 +239,7 @@ def enhance_audio(audio_raw: np.ndarray, sample_rate: int, microphone_idx: np.nd
     audio_aligned, doas = align_audio(audio_raw, sample_rate, microphone_idx)
 
     # Choose closest microphones
-    mic_idx = choose_microphones(doas)
+    mic_idx = choose_microphones(doas, microphone_idx)
 
     # Separate into sources
     sources = separate_audio(audio_aligned[mic_idx], sample_rate)
