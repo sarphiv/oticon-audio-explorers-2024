@@ -227,6 +227,7 @@ def enhance_audio(audio_raw: np.ndarray, sample_rate: int, microphone_idx: np.nd
             - The enhanced and heavily noise suppressed speech (num_samples,).
     """
     # Normalize the audio
+    audio_raw = audio_raw.astype(np.float32)
     audio_raw = (audio_raw - audio_raw.mean(axis=1, keepdims=True)) / np.abs(audio_raw).max(axis=1, keepdims=True)
 
     # Align audio before IVA
