@@ -75,13 +75,13 @@ mic_pos = np.array([
 
 
 
-def align_audio(audio_raw: np.ndarray, sample_rate: int, microphone_idx: np.ndarray | None = None) -> tuple[np.ndarray, np.ndarray]:
+def align_audio(audio_raw: np.ndarray, sample_rate: int, microphone_pos: np.ndarray | None = None) -> tuple[np.ndarray, np.ndarray]:
     """Aligns the audio channels using MUSIC for DOA estimation.
 
     Args:
         audio_raw (np.ndarray): The raw audio data with shape (num_channels, num_samples).
         sample_rate (int): The sample rate of the audio.
-        microphone_idx (np.ndarray | None): Indices of subset of microphones to use. Set to None to use all microphones.
+        microphone_pos (np.ndarray | None): Positions of microphones (num_channels, 3). Set to None to use all default microphones.
 
     Returns:
         tuple[np.ndarray, np.ndarray]: Aligned audio data and directions of arrival
@@ -90,14 +90,8 @@ def align_audio(audio_raw: np.ndarray, sample_rate: int, microphone_idx: np.ndar
     """
     # WARN: Very nasty and hacky competition code, look away
 
-
-    # If microphone indices provided, only use those for alignment
-    if microphone_idx is not None:
-        audio_raw = audio_raw[microphone_idx]
-    # Else, use all microphone
-    else:
-        microphone_idx = np.arange(audio_raw.shape[0])
-
+    # If no microphone positions provided, use default
+    microphone_pos = microphone_pos if microphone_pos is not None else mic_pos
 
     # Define the first few seconds to be clean speech
     clean_idx = int(CLEAN_SPEECH_TIME * sample_rate)
@@ -112,13 +106,13 @@ def align_audio(audio_raw: np.ndarray, sample_rate: int, microphone_idx: np.ndar
         th.tensor(audio_raw[:, :clean_idx], dtype=th.float32).T.view(1, clean_idx, audio_raw.shape[0]).cuda()
     ))
 
-    music = Music(mics=th.tensor(mic_pos[microphone_idx], dtype=th.float32).cuda(), sample_rate=sample_rate).cuda()
+    music = Music(mics=th.tensor(microphone_pos, dtype=th.float32).cuda(), sample_rate=sample_rate).cuda()
     doas: th.Tensor = music(covariance)[0]
 
     # Get time deltas
     taus: np.ndarray = doas2taus(
         doas=doas.view(1, *doas.shape), 
-        mics=th.tensor(mic_pos[microphone_idx], dtype=th.float32), 
+        mics=th.tensor(microphone_pos, dtype=th.float32), 
         fs=sample_rate
     )[0].numpy().astype(np.int64)
 
@@ -141,26 +135,25 @@ def align_audio(audio_raw: np.ndarray, sample_rate: int, microphone_idx: np.ndar
 
 
 
-def choose_microphones(doas: np.ndarray, microphone_idx: np.ndarray | None = None) -> np.ndarray:
+def choose_microphones(doas: np.ndarray, microphone_pos: np.ndarray | None = None) -> np.ndarray:
     """Choose the four microphones closest to the direction of arrival. Assuming stationary speaker.
     
     Args:
         doas (np.ndarray): The direction of arrival estimates with shape (num_time_frames, 3).
-        microphone_idx (np.ndarray | None): Indices of subset of microphones to use. Set to None to use all microphones.
+        microphone_pos (np.ndarray | None): Positions of microphones (num_channels, 3). Set to None to use all default microphones.
 
     Returns:
         np.ndarray: The indices of the four microphones closest to the direction of arrival.
     """
-    # If microphone indices not provided, use all microphones
-    if microphone_idx is None:
-        microphone_idx = np.arange(audio_raw.shape[0])
+    # If no microphone positions provided, use default
+    microphone_pos = microphone_pos if microphone_pos is not None else mic_pos
     
     # Get unit direction
     direction = doas.mean(0)
     direction /= np.linalg.norm(direction, 2)
     
     # Normalize microphone positions to unit vectors
-    mic_pos_unit = mic_pos[microphone_idx] / np.linalg.norm(mic_pos[microphone_idx], 2, axis=1)[:, None]
+    mic_pos_unit = microphone_pos / np.linalg.norm(microphone_pos, 2, axis=1)[:, None]
 
 
     # Get indices of four closest microphones
@@ -231,15 +224,19 @@ def enhance_audio(audio_raw: np.ndarray, sample_rate: int, microphone_idx: np.nd
             - The enhanced and natural sounding speech with shape (num_samples,).
             - The enhanced and heavily noise suppressed speech (num_samples,).
     """
+    # Take subset of microphone and audio if requested
+    microphone_pos = mic_pos[microphone_idx] if microphone_idx is not None else mic_pos
+    audio_raw = audio_raw[microphone_idx] if microphone_idx is not None else audio_raw
+
     # Normalize the audio
     audio_raw = audio_raw.astype(np.float32)
     audio_raw = (audio_raw - audio_raw.mean(axis=1, keepdims=True)) / np.abs(audio_raw).max(axis=1, keepdims=True)
 
     # Align audio before IVA
-    audio_aligned, doas = align_audio(audio_raw, sample_rate, microphone_idx)
+    audio_aligned, doas = align_audio(audio_raw, sample_rate, microphone_pos)
 
     # Choose closest microphones
-    mic_idx = choose_microphones(doas, microphone_idx)
+    mic_idx = choose_microphones(doas, microphone_pos)
 
     # Separate into sources
     sources = separate_audio(audio_aligned[mic_idx], sample_rate)
@@ -279,8 +276,9 @@ if __name__ == "__main__":
     # Load arguments
     args = tyro.cli(Args)
 
-
-    for file in tqdm(args.input_dir.glob("*.wav")):
+    # NOTE: Remove the call to "len" if the input directory is large
+    input_files = args.input_dir.glob("*.wav")
+    for file in tqdm(input_files, total=len(list(input_files))):
         # Load audio
         sample_rate, audio_raw = wavfile.read(file)
         audio_enhanced = enhance_audio(audio_raw.T, sample_rate)
