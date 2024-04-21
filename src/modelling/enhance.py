@@ -221,7 +221,7 @@ def enhance_audio(audio_raw: np.ndarray, sample_rate: int, microphone_idx: np.nd
         microphone_idx (np.ndarray | None): Indices of subset of microphones to use (num_mics,). Set to None to use all microphones.
 
     Returns:
-        tuple[np.ndarray, np.ndarray, np.ndarray]: A tuple containing the enhanced speech at various stages:
+        EnhancedAudio: A dataclass containing the enhanced speech at various stages with their sample rates:
             - The separated speech source with shape (num_samples,).
             - The enhanced and natural sounding speech with shape (num_samples,).
             - The enhanced and heavily noise suppressed speech (num_samples,).
