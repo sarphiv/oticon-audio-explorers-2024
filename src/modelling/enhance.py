@@ -226,7 +226,7 @@ def enhance_audio(audio_raw: np.ndarray, sample_rate: int, microphone_idx: np.nd
     """
     # Take subset of microphone and audio if requested
     microphone_pos = mic_pos[microphone_idx] if microphone_idx is not None else mic_pos
-    audio_raw = audio_raw[microphone_idx] if microphone_idx is not None else audio_raw
+    # audio_raw = audio_raw[microphone_idx] if microphone_idx is not None else audio_raw
 
     # Normalize the audio
     audio_raw = audio_raw.astype(np.float32)
