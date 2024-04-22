@@ -26,7 +26,7 @@ To evaluate the method, first create a dataset by the description below.
 
 When a dataset is created, simply run 
 ```
-python -m modelling.data.evaluate
+python -m modelling.evaluate
 ```
 Note that you may have to change the data directiory in the module.
 
