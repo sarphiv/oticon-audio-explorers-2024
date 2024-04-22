@@ -104,8 +104,8 @@ def calculate_metrics(clean_audio: np.ndarray, clean_sr: int, enhanced_audio: np
 
 
 def run_metrics(clean_dir: Path, mixes_files: Path, mic_idx: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    clean_files = list(clean_dir.glob("*.wav"))[:10]
-    mixed_files = list(mixes_files.glob("*.wav"))[:10]
+    clean_files = list(clean_dir.glob("*.wav"))
+    mixed_files = list(mixes_files.glob("*.wav"))
 
     # NOTE: Stored as: SNR, PESQ, STOI
     stats_sep = np.empty((len(mixed_files), 3))
@@ -136,48 +136,54 @@ def run_metrics(clean_dir: Path, mixes_files: Path, mic_idx: np.ndarray) -> tupl
 
 
 if __name__ == "__main__":
-    clean_files = Path("data/sim_final/clean")
-    mixed_files = Path("data/sim_final/mixed")
-    mic_idx = np.array([0, 1, 2, 3])
+    data_sets = ["sim_final","sim_final2","sim_final3"]
+    for data_set in data_sets:
+        clean_files = Path(f"data/{data_set}/clean")
+        mixed_files = Path(f"data/{data_set}/mixed")
+        mic_idx = np.array([0, 1, 2, 3])
 
-    mic_arrays = np.array([
-        [0, 1, 2, 3],
-        [10, 12, 6, 8],
-        [4, 1, 2, 17],
-        [7, 14, 11, 30],
-        [23, 11, 27, 7],
-        [4, 2, 18, 20],
-        [8, 10, 22, 28],
-        [9, 5, 2, 4],
-        [4, 8, 20, 22]
-    ])
+        mic_arrays = np.array([
+            [0, 1, 2, 3],
+            [10, 12, 6, 8],
+            [4, 1, 2, 17],
+            [7, 14, 11, 30],
+            [23, 11, 27, 7],
+            [4, 2, 18, 20],
+            [8, 10, 22, 28],
+            [9, 5, 2, 4],
+            [4, 8, 20, 22]
+        ])
 
-    outstr = ""
-    for i, mic_idx in enumerate(mic_arrays):
-        stats_sep, stats_nat, stats_sup, stats_raw = run_metrics(clean_files, mixed_files, mic_idx)
-        
-        stats_sep = np.round(stats_sep.mean(0), 3)
-        stats_nat = np.round(stats_nat.mean(0), 3)
-        stats_sup = np.round(stats_sup.mean(0), 3)
-        stats_raw = np.round(stats_raw.mean(0), 3)
-        
-        print("intermediate results:")
-        print(stats_sep)
-        print(stats_nat)
-        print(stats_sup)
-        print(stats_raw)
-        
-        for idx in mic_idx:
-            outstr += f"{idx}, "
-        outstr = outstr[:-2] + " & "
-        outstr += str(stats_sep[0]) + " & " + str(stats_nat[0]) + " & " + str(stats_sup[0]) + " & " + str(stats_raw[0]) + " & "
-        outstr += str(stats_sep[1]) + " & " + str(stats_nat[1]) + " & " + str(stats_sup[1]) + " & " + str(stats_raw[1]) + " & "
-        outstr += str(stats_sep[2]) + " & " + str(stats_nat[2]) + " & " + str(stats_sup[2]) + " & " + str(stats_raw[2]) + " \\\\ \n"
-        
-        if (i+1)%2 == 0:
-            outstr += "\\rowcolor{gray!20}\\cellcolor{white}\n"
-        
-    print(outstr)
+        outstr = ""
+        for i, mic_idx in enumerate(mic_arrays):
+            stats_sep, stats_nat, stats_sup, stats_raw = run_metrics(clean_files, mixed_files, mic_idx)
+            
+            stats_sep = np.round(stats_sep.mean(0), 3)
+            stats_nat = np.round(stats_nat.mean(0), 3)
+            stats_sup = np.round(stats_sup.mean(0), 3)
+            stats_raw = np.round(stats_raw.mean(0), 3)
+            
+            print("intermediate results:")
+            print(stats_sep)
+            print(stats_nat)
+            print(stats_sup)
+            print(stats_raw)
+            
+            for idx in mic_idx:
+                outstr += f"{idx}, "
+            outstr = outstr[:-2] + " & "
+            outstr += str(stats_sep[0]) + " & " + str(stats_nat[0]) + " & " + str(stats_sup[0]) + " & " + str(stats_raw[0]) + " & "
+            outstr += str(stats_sep[1]) + " & " + str(stats_nat[1]) + " & " + str(stats_sup[1]) + " & " + str(stats_raw[1]) + " & "
+            outstr += str(stats_sep[2]) + " & " + str(stats_nat[2]) + " & " + str(stats_sup[2]) + " & " + str(stats_raw[2]) + " \\\\ \n"
+            
+            if (i+1)%2 == 0:
+                outstr += "\\rowcolor{gray!20}\\cellcolor{white}\n"
+            
+        # save the string to a text file
+        with open(f"{data_set}.txt", "w") as text_file:
+            text_file.write(outstr)
+            
+        print(outstr)
 
     # print(" ==== AVERAGE METRICS ==== ")
     # print("Signal type |SNR |PESQ |ESTOI |")

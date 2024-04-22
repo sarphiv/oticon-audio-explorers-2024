@@ -55,9 +55,9 @@ if __name__ == "__main__":
     ids = np.array(list(ANGLE_DICT.keys()))
     
     # save to file
-    np.save("data/mic_pos.npy", coords)
+    # np.save("data/mic_pos.npy", coords)
 
-    viz = False
+    viz = True
     
     # ^^^^ set to True to visualize microphone positions
     # --------------------------------------------------
@@ -70,6 +70,7 @@ if __name__ == "__main__":
 
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d', proj_type='ortho')
+    # plt.close()
 
     ax.scatter(coords[:,0], coords[:,1], coords[:,2])
     ax.set_box_aspect([1, 1, 1])  # Set equal aspect ratio for all axes
