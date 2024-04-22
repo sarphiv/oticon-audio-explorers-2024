@@ -21,9 +21,14 @@ Provide an input directory full of audio files with 32 channels. The microphone 
 python -m modelling.enhance --input_dir=data/raw --output_dir=output
 ```
 
-## Evaluation
-<INSERT DESCRIPTION OF HOW TO REPRODUCE RESULTS>
+## Evaluation  
+To evaluate the method, first create a dataset by the description below.
 
+When a dataset is created, simply run 
+```
+python -m modelling.data.evaluate.py
+```
+Note that you make have to change the data directiory in *__main__*
 
 ## Data generation
 
@@ -46,5 +51,11 @@ To create your own dataset for validation / and future pretraining of models fir
 In both cases, either Unix or Windows, choose the desired files from the list and run the script.
 
 **Generating data**  
-To generate a dataset, simple run: ``src/modelling/data/generate_data.py``. Note that you may have to change the directories in the Config
+To generate a dataset, simple run:
+
+```
+python modelling/data/generate_data.py
+```
+
+Note that you may have to change the directories in the Config
 class (in the same script).
