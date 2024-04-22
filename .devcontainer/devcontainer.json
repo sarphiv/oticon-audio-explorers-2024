@@ -17,6 +17,7 @@
         },
         "ghcr.io/meaningful-ooo/devcontainer-features/fish:1": { }
     },
+    "updateRemoteUserUID": false,
     "customizations": {
         "vscode": {
             "extensions": [

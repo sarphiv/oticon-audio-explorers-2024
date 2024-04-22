@@ -2,174 +2,194 @@ from pystoi import stoi
 from pesq import pesq
 import numpy as np
 import os 
-import librosa
 from modelling.enhance import enhance_audio
 from pathlib import Path
 from scipy.io import wavfile
 import tqdm
+import scipy
+from scipy.signal import resample
+import librosa
+import fast_align_audio 
 
-def calculate_snr(reference_signal, target_signal):
+
+def normalize(x: np.ndarray) -> np.ndarray:
+    x = x.astype(np.float32)
+    return x / np.max(np.abs(x))
+
+
+def calculate_snr(clean_audio: np.ndarray, enhanced_audio: np.ndarray) -> float:
     # Calculate the Signal to Noise Ratio (SNR) for a single channel
     # SNR = 10 * log10(P_signal / P_noise)
     
-    signal_power = np.linalg.norm(target_signal)**2
-    noise_power = np.linalg.norm(target_signal - reference_signal)**2
-    if noise_power == 0:
-        return float('inf')  # Avoid division by zero
-    snr = 10 * np.log10(signal_power / noise_power)
-    return snr
+    signal_power = np.sum(clean_audio**2)
+    noise_power = np.sum((clean_audio - enhanced_audio)**2)
+
+    return 10 * np.log10(signal_power / (noise_power + 1e-10))
+
+
+def calculate_pesq(clean_audio, enhanced_audio, sample_rate) -> float:
+    sample_rate_new = 16000
+    clean_audio = resample(clean_audio, int(len(clean_audio) / sample_rate * sample_rate_new), axis=0)
+    enhanced_audio = resample(enhanced_audio, int(len(enhanced_audio) / sample_rate * sample_rate_new), axis=0)
+
+    return pesq(sample_rate_new, clean_audio, enhanced_audio, 'wb')
+
+
+def calculate_estoi(clean_audio, enhanced_audio, sample_rate: int) -> float:
+    return stoi(clean_audio, enhanced_audio, sample_rate, extended=True)
+
+
+def align_audio(reference_audio: np.ndarray, desynced_audio: np.ndarray) -> np.ndarray:
+    offset, _ = fast_align_audio.find_best_alignment_offset(
+        reference_signal=reference_audio,
+        delayed_signal=desynced_audio,
+        max_offset_samples=20,
+        lookahead_samples=60,
+    )
+
+
+    if offset < 0:
+        return np.pad(desynced_audio[:offset], (-offset, 0))
+    elif offset > 0:
+        return np.pad(desynced_audio[offset:], (0, offset))
+    else:
+        return desynced_audio
 
 
 
+def calculate_metrics(clean_audio: np.ndarray, clean_sr: int, enhanced_audio: np.ndarray, enhanced_sr: int) -> np.ndarray:
+    # Normalize just in case
+    clean_audio = normalize(clean_audio)
+    enhanced_audio = normalize(enhanced_audio)
 
-def calculate_metrics(true_signal, audio_arrays):
-
-    """
-    Input:
-    true_signal: numpyarray
-    audio_arrays: list of numpy arrays extracted from EnhancedAudio
-
-    Output: 
-    signal_dict:  dictionary with keys as indices and values as another dictionary of scores
-    """
-
-    signal_dict = {}
-    ar_list = ["Seperated Audio", "Natural Audio", "Suppressed Audio", "Raw Audio"]
+    # If the sampling rates are different, upsample the lower one
+    if clean_sr != enhanced_sr:
+        if clean_sr < enhanced_sr:
+            clean_audio = resample(clean_audio, int(clean_audio.shape[1] / clean_sr * enhanced_sr), axis=1)
+            clean_sr = enhanced_sr
+        else:
+            enhanced_audio = resample(enhanced_audio, int(enhanced_audio.shape[0] / enhanced_sr * clean_sr), axis=0)
+            enhanced_sr = clean_sr
 
 
-    # 16000 Hz aligns better with 'wb' mode in PESQ
-    default_sr = 16000
+    # Sample rates are the same now, reflect that in the variable name
+    sample_rate = enhanced_sr
 
-    min_length = min(len(true_signal), *(len(x) for x in audio_arrays))
-    true_signal = true_signal[:min_length]
+    # Cut end of audio to have correct shape
+    # NOTE: Noise sometimes continues after the speech ends, so cut the audio to the length of the clean audio
+    # NOTE: Enhanced audio is not guaranteed to have same length because of inaccuracies in transformations
+    length = min(clean_audio.shape[1], enhanced_audio.shape[0])
+    clean_audio = clean_audio[:, :length]
+    enhanced_audio = enhanced_audio[:length]
+
+
+    # Align signals
+    # TODO: Ensure the alignment lags aren't too crazy
+    enhanced_audio = align_audio(clean_audio[0], enhanced_audio)
+
+    for i in range(1, clean_audio.shape[0]-1):
+        clean_audio[i] = align_audio(clean_audio[0], clean_audio[i])
+
+
+    # Collapse audio to mono to enable metrics calculation
+    clean_audio = clean_audio.mean(axis=0)
+
     
-    normalized_true = true_signal / np.max(np.abs(true_signal))
-
-    for i, enhanced_sig in enumerate(audio_arrays):
-        # Trim all signals so they are the same size
-        enhanced_sig = enhanced_sig[:min_length]
-
-        metrics = {}
-        
-        normalized_enhanced = enhanced_sig / np.max(np.abs(enhanced_sig))
-        
-        # Compute PESQ score
-        # pesq(fs, ref, deg, mode='wb', on_error=PesqError.RAISE_EXCEPTION)
-        # fs:  integer, sampling rate
-        # ref: numpy 1D array, reference audio signal
-        # deg: numpy 1D array, degraded audio signal
-        
-        try:
-            pesq_score = pesq(default_sr, normalized_true, normalized_enhanced, 'wb')  # 'wb' is for wide-band
-            metrics['PESQ'] = pesq_score
-        except Exception as e:
-            print(f"PESQ: {e}")
-
-        # Compute STOI score
-        # stoi(x, y, fs_sig, extended=False)
-        # x (np.ndarray): clean original speech
-        # y (np.ndarray): denoised speech
-        # fs_sig (int): sampling rate of x and y
-        try:
-            stoi_score = stoi(normalized_true, normalized_enhanced, default_sr, extended=False)
-            metrics['STOI'] = stoi_score
-        except Exception as e:
-            print(f"STOI: {e}")
-   
-        # Compute the SNR score
-        try:
-            snr_score = calculate_snr(normalized_true, normalized_enhanced)
-            metrics['SNR'] = snr_score
-        except Exception as e:
-            print(f"SNR: {e}")
-
-        signal_dict[ar_list[i]] = metrics
-
-    return signal_dict
-
-#mic_idx feed
-# np.array([1, 2, 3, 4])
-# np.array([32, 12, 30, 14])
+    return np.array([
+        calculate_snr(clean_audio, enhanced_audio), 
+        calculate_pesq(clean_audio, enhanced_audio, sample_rate), 
+        calculate_estoi(clean_audio, enhanced_audio, sample_rate)
+    ])
 
 
-def run_metrics(clean_files : Path, raw_files : Path, mic_idx, sample_r = 16000):
-    """
-    Input:
-    clean_files: (str) Directory with the clean files
-    raw_files: (str) Directory with the raw files
-    mic_idx: (np.array) A numpy array with 4 microphone indicies listed
 
-    Output: 
-    metrics_dict: (dict) A dictionary with mic_idx as keys and dicts as values with the metrics listed
-    """
-    # This is how I imagine the output to look like: {([1, 2, 3, 4]): {Sep: {PESQ: 1, STOI: 1, SNR: 1}, Natural: {PESQ: 1, STOI: 1, SNR: 1}, Supp: {PESQ: 1, STOI: 1, SNR: 1}}}
+def run_metrics(clean_dir: Path, mixes_files: Path, mic_idx: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    clean_files = list(clean_dir.glob("*.wav"))
+    mixed_files = list(mixes_files.glob("*.wav"))
 
-    metrics_dict = {}
+    # NOTE: Stored as: SNR, PESQ, STOI
+    stats_sep = np.empty((len(mixed_files), 3))
+    stats_nat = np.empty((len(mixed_files), 3))
+    stats_sup = np.empty((len(mixed_files), 3))
+    stats_raw = np.empty((len(mixed_files), 3))
 
 
-    # List all files in directories
-    clean_files_list = clean_files.glob("*.wav")
-    raw_files_list = raw_files.glob("*.wav")
-    # clean_files_list = sorted([os.path.join(clean_files, f) for f in os.listdir(clean_files) if f.endswith('.wav')])
-    # raw_files_list = sorted([os.path.join(raw_files, f) for f in os.listdir(raw_files) if f.endswith('.wav')])
+    for i, (clean_file, mixed_file) in tqdm.tqdm(enumerate(zip(clean_files, mixed_files)), total=len(clean_files)):
+        # Load and prepare the audio files
+        clean_sr, clean_audio = wavfile.read(clean_file)
+        mixed_sr, mixed_audio = wavfile.read(mixed_file)
 
-    # Ensure the list contains the same amount of files
-    # assert len(clean_files_list) == len(raw_files_list), "The number of clean and raw files must be the same"
+        clean_audio, mixed_audio = normalize(clean_audio.T[mic_idx]), normalize(mixed_audio.T[mic_idx])
 
-    for i, (clean_file, raw_file) in tqdm.tqdm(enumerate(zip(clean_files_list, raw_files_list))):
-        # load using scipy instead of librosa
-        
-        
-        sr_clean, clean_audio = wavfile.read(clean_file)
-        sr_raw, raw_audio = wavfile.read(raw_file)
+        # Run the enhancement
+        enhanced_audio = enhance_audio(mixed_audio, mixed_sr, mic_idx)
 
-        # NOTE: There is an error here that should disapear when sap pushes
-        enhanced_audi = enhance_audio(raw_audio.T, sample_r, microphone_idx = mic_idx)
+        # Calculate metrics
+        stats_sep[i] = calculate_metrics(clean_audio, clean_sr, *enhanced_audio.separated)
+        stats_nat[i] = calculate_metrics(clean_audio, clean_sr, *enhanced_audio.natural)
+        stats_sup[i] = calculate_metrics(clean_audio, clean_sr, *enhanced_audio.suppressed)
+        stats_raw[i] = calculate_metrics(clean_audio, clean_sr, mixed_audio.mean(0), mixed_sr)
 
-        separated, srp = enhanced_audi.separated
-        natural, srn = enhanced_audi.natural
-        suppressed, srs = enhanced_audi.suppressed
 
-        audio_array = [separated, natural, suppressed, raw_audio.mean(axis=1)]
+    # Return stats
+    return stats_sep, stats_nat, stats_sup, stats_raw
 
-        signal_dict = calculate_metrics(clean_audio.mean(axis=1), audio_array)
-        
-        metrics_dict[i] = signal_dict
-        
-        if i > 2:
-            break
-        
-        
-    return metrics_dict
 
 if __name__ == "__main__":
-    
-    clean_files = Path("data/sim_data_less_noise/clean")
-    raw_files = Path("data/sim_data_less_noise/clean")
-    mic_idx = np.array([1, 2, 3, 4])
+    data_sets = ["sim_final","sim_final2","sim_final3"]
+    for data_set in data_sets:
+        clean_files = Path(f"data/{data_set}/clean")
+        mixed_files = Path(f"data/{data_set}/mixed")
+        mic_idx = np.array([0, 1, 2, 3])
 
-    metrics_dict = run_metrics(clean_files, raw_files, mic_idx)
-    
-    seperated = [0,0,0]
-    natural = [0,0,0]
-    suppressed = [0,0,0]
-    raw = [0,0,0]
-    means = {"Seperated Audio": [[],[],[]], "Natural Audio": [[],[],[]], "Suppressed Audio": [[],[],[]], "Raw Audio": [[],[],[]]}
-    for i, metrics in enumerate(metrics_dict.values()):
-        
-        for j, (name, metric) in enumerate(metrics.items()):
-            means[name][0].append(metric["PESQ"])
-            means[name][1].append(metric["STOI"])
-            means[name][2].append(metric["SNR"])
+        mic_arrays = np.array([
+            [0, 1, 2, 3],
+            [10, 12, 6, 8],
+            [4, 1, 2, 17],
+            [7, 14, 11, 30],
+            [23, 11, 27, 7],
+            [4, 2, 18, 20],
+            [8, 10, 22, 28],
+            [9, 5, 2, 4],
+            [4, 8, 20, 22]
+        ])
+
+        outstr = ""
+        for i, mic_idx in enumerate(mic_arrays):
+            stats_sep, stats_nat, stats_sup, stats_raw = run_metrics(clean_files, mixed_files, mic_idx)
             
-    print(" ==== AVERAGE METRICS ==== ")
-    print("Signal type |PESQ|STOI|SNR|")
-    print(f"Seperated:  {np.round(np.mean(means['Seperated Audio'],axis=1), 3)}")
-    print(f"Natural:    {np.round(np.mean(means['Natural Audio'],axis=1), 3)}")
-    print(f"Suppressed: {np.round(np.mean(means['Suppressed Audio'],axis=1), 3)}")
-    print(f"Raw:        {np.round(np.mean(means['Raw Audio'],axis=1), 3)}")
-    
+            stats_sep = np.round(stats_sep.mean(0), 3)
+            stats_nat = np.round(stats_nat.mean(0), 3)
+            stats_sup = np.round(stats_sup.mean(0), 3)
+            stats_raw = np.round(stats_raw.mean(0), 3)
             
-    
-    
-    # print(metrics_dict)
+            print("intermediate results:")
+            print(stats_sep)
+            print(stats_nat)
+            print(stats_sup)
+            print(stats_raw)
+            
+            for idx in mic_idx:
+                outstr += f"{idx}, "
+            outstr = outstr[:-2] + " & "
+            outstr += str(stats_sep[0]) + " & " + str(stats_nat[0]) + " & " + str(stats_sup[0]) + " & " + str(stats_raw[0]) + " & "
+            outstr += str(stats_sep[1]) + " & " + str(stats_nat[1]) + " & " + str(stats_sup[1]) + " & " + str(stats_raw[1]) + " & "
+            outstr += str(stats_sep[2]) + " & " + str(stats_nat[2]) + " & " + str(stats_sup[2]) + " & " + str(stats_raw[2]) + " \\\\ \n"
+            
+            if (i+1)%2 == 0:
+                outstr += "\\rowcolor{gray!20}\\cellcolor{white}\n"
+            
+        # save the string to a text file
+        with open(f"{data_set}.txt", "w") as text_file:
+            text_file.write(outstr)
+            
+        print(outstr)
+
+    # print(" ==== AVERAGE METRICS ==== ")
+    # print("Signal type |SNR |PESQ |ESTOI |")
+    # print(f"Seperated:  {np.round(stats_sep.mean(0), 3)}")
+    # print(f"Natural:    {np.round(stats_nat.mean(0), 3)}")
+    # print(f"Suppressed: {np.round(stats_sup.mean(0), 3)}")
+    # print(f"Raw:        {np.round(stats_raw.mean(0), 3)}")
+
+#legendary'nt uncommon common rare epic legendary legendary'nt'nt
