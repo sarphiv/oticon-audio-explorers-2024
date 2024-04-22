@@ -35,3 +35,16 @@ python -m modelling.utils.export_mic_pos
 The command will create `mic_pos.npy` in `data/`.
 The numpy file is a 32x3 np.ndarray with the shape: `n_mics X 3`.
 The microphone positions are centered around the origin with `cm` as its unit.
+
+### Calculating custom dataset
+
+To create your own dataset for validation / and future pretraining of models first download the DNS-4 dataset from:
+
+* Unix: Use the provided scripts from: https://github.com/microsoft/DNS-Challenge
+* Windows: Use the ported ``src/modelling/data/utils/download_dns4data.bat`` to download the data.
+
+In both cases, either Unix or Windows, choose the desired files from the list and run the script.
+
+**Generating data**  
+To generate a dataset, simple run: ``src/modelling/data/generate_data.py``. Note that you may have to change the directories in the Config
+class (in the same script).
